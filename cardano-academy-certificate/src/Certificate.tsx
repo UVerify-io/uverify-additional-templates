@@ -153,11 +153,72 @@ function resolveBadge(badgeId: string): BadgeContent | undefined {
   return BADGE_CATALOG[badgeId] ?? BADGE_CATALOG[LEGACY_BADGE_IDS[badgeId] ?? ''];
 }
 
+// Badges are only genuine when signed by the Cardano Foundation wallet. The
+// mainnet and preprod addresses share this payment credential, which is what
+// the backend reports as `certificate.address`.
 const ISSUER = {
   name: 'Cardano Foundation',
   url: 'https://cardanofoundation.org',
   academyUrl: 'https://cardanofoundation.org/en/academy',
+  paymentCredential: '5a8dd1a6f5208f5fa66f8c3459a40585f9c752f44b909ab77f783ae3',
+  addresses: [
+    'addr1q9dgm5dx75sg7haxd7xrgkdyqkzln36j739epx4h0aur4c6tqj46m7mmw95tehhrvqz59x83n7tsnyqcxarfraxvk4kqevsym9',
+    'addr_test1qpdgm5dx75sg7haxd7xrgkdyqkzln36j739epx4h0aur4c6tqj46m7mmw95tehhrvqz59x83n7tsnyqcxarfraxvk4kq66dyh6',
+  ],
 };
+
+function isIssuedByCardanoFoundation(certificate: UVerifyCertificate | undefined): boolean {
+  return certificate?.address?.toLowerCase() === ISSUER.paymentCredential;
+}
+
+function UnofficialCertificateNotice({ hash, certificate }: { hash: string; certificate: UVerifyCertificate }): JSX.Element {
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '32px 16px',
+        backgroundColor: C.pageBg,
+        backgroundImage: 'radial-gradient(#c6c6c6 1px, transparent 1px)',
+        backgroundSize: '24px 24px',
+        fontFamily: '"Inter", "Helvetica Neue", Arial, sans-serif',
+        color: C.text,
+      }}
+    >
+      <div
+        style={{
+          maxWidth: '560px',
+          width: '100%',
+          background: C.white,
+          border: '1px solid #f5b5c8',
+          borderLeft: '4px solid #e11d48',
+          borderRadius: '12px',
+          padding: '28px',
+          boxSizing: 'border-box',
+        }}
+      >
+        <p style={{ margin: '0 0 8px', fontSize: '11px', fontWeight: 700, letterSpacing: '0.8px', textTransform: 'uppercase', color: '#e11d48' }}>
+          Not an official Cardano Academy badge
+        </p>
+        <h1 style={{ margin: '0 0 14px', fontSize: '22px', fontWeight: 700 }}>
+          This certificate was not issued by the {ISSUER.name}
+        </h1>
+        <p style={{ margin: '0 0 18px', fontSize: '14px', lineHeight: 1.7, color: C.textMuted }}>
+          It uses the Cardano Academy layout, but the wallet that signed it is not the
+          {' '}{ISSUER.name} wallet. Treat its contents as unverified.
+        </p>
+        <p style={{ margin: '0 0 6px', fontSize: '12px', color: C.textMuted }}>
+          Signing wallet: <span style={{ fontFamily: 'monospace', color: C.text, wordBreak: 'break-all' }}>{certificate.issuer}</span>
+        </p>
+        <p style={{ margin: 0, fontSize: '12px', color: C.textMuted }}>
+          Certificate hash: <span style={{ fontFamily: 'monospace', color: C.text, wordBreak: 'break-all' }}>{hash}</span>
+        </p>
+      </div>
+    </div>
+  );
+}
 
 const SHA256_HEX = /^[0-9a-f]{64}$/i;
 
@@ -397,7 +458,7 @@ function ShareBadgeButton({
   );
   const embedSnippet = buildEmbedSnippet(
     shareUrl,
-    `${window.location.origin}/og/cardano-academy-certificate.png`,
+    `${window.location.origin}/og/cardanoAcademyCertificate.png`,
     badgeName,
   );
 
@@ -930,6 +991,13 @@ function formatIssuedAt(date: Date): string {
 
 class CardanoAcademyCertificate extends Template {
   public name = 'Cardano Academy Badge';
+  // Pre-selects "restricted" in the creation form. The policy itself must be
+  // stored on-chain as uverify_update_policy, the page does not apply defaults.
+  public defaultUpdatePolicy = 'restricted' as const;
+
+  // Hides the template in the creation form for other wallets. Display-time
+  // enforcement happens in render() through the payment credential.
+  protected whitelist: string[] = ISSUER.addresses;
   public theme: Partial<ThemeSettings> = {
     background: 'bg-white',
     footer: { hide: true },
@@ -969,7 +1037,14 @@ class CardanoAcademyCertificate extends Template {
     const skills = skillsRaw.split(',').map((s) => s.trim()).filter(Boolean);
     const learningUrl = String(metadata['uv_url_learningUrl'] || ISSUER.academyUrl);
     const earningCriteriaText = String(badge?.earningCriteria || metadata.earningCriteriaText || '');
-    const issuerPaymentCredential = extra.issuer || certificate?.issuer;
+    // certificate.address is the hex payment credential of the signing wallet.
+    // extra.issuer is the same key as a Bech32 enterprise address, which the
+    // credential API does not accept.
+    const issuerPaymentCredential = certificate?.address;
+
+    if (certificate && !isIssuedByCardanoFoundation(certificate)) {
+      return <UnofficialCertificateNotice hash={hash} certificate={certificate} />;
+    }
 
     const txUrl = certificate
       ? `https://cardanoscan.io/transaction/${certificate.transactionHash}`

@@ -21,6 +21,8 @@ npm run dev
 
 UVerify only imports `src/Certificate.tsx`. Run `npm run lint` and `npm run build` before opening a pull request.
 
+`og.png` is the Open Graph image (1200x630) shown in link previews. Regenerate it with `npm run og` after changing the badge design, the script reads the ada logo paths from `src/Certificate.tsx`.
+
 ## On-chain metadata
 
 A badge certificate carries three fields. All long texts (badge description, skills, earning criteria) are fixed in `BADGE_CATALOG` inside `src/Certificate.tsx` and resolved from `badgeId`, which keeps a certificate at about 140 bytes of metadata.
@@ -30,10 +32,17 @@ A badge certificate carries three fields. All long texts (badge description, ski
 | `badgeId` | `BLOCKCHAIN_FUNDAMENTALS` | Catalog key. Old slug IDs such as `blockchain-fundamentals` still resolve through `LEGACY_BADGE_IDS`. |
 | `uv_url_name` | `b2ac2ef4…8f77` | `sha256("<name>~<salt>")`. The UI reveals the name only when `?name=<name>~<salt>` matches, otherwise the badge shows "privacy-protected recipient". |
 | `issuedAt` | `2026-04-02` | `YYYY-MM-DD`, rendered as "April 02, 2026". Falls back to the transaction time. |
+| `uverify_update_policy` | `restricted` | Only the issuing wallet can add versions to a badge. Must be set in the first submission, the page applies no default. The template pre-selects it in the creation form. |
 
 The issuer name is fixed to Cardano Foundation. When a new badge appears in the Academy export, add its texts to `BADGE_CATALOG` under a new enum key.
 
 Metadata for the sandbox deployment is generated from the Academy CSV export with `sandbox/simulator/build-academy-plan.py` in [uverify-examples](https://github.com/UVerify-io/uverify-examples), see the simulator README there.
+
+## Issuer restriction
+
+Only badges signed by the Cardano Foundation wallet render as Academy badges. The template compares `certificate.address`, the hex payment credential of the signing wallet, with `ISSUER.paymentCredential` (`5a8dd1a6…83ae3`, shared by the mainnet address `addr1q9dgm5dx…evsym9` and the preprod address `addr_test1qpdgm5dx…66dyh6`). A certificate from any other wallet renders a "not an official Cardano Academy badge" notice with the signing address and the hash instead of the badge. Preview it with `?issuer=other` in the dev harness.
+
+The same two addresses are set as the template `whitelist`, which hides the template in the creation form for other wallets. That check runs in the creation UI only, the display-time check above is what protects recipients.
 
 ## Issuer identity (vLEI binding)
 
@@ -53,7 +62,7 @@ To make the binding mandatory, uncomment `requiredCredentials = ['identity']` in
 
 ## Registering the template
 
-Add an entry to `additional-templates.json` in uverify-ui. The `name` becomes the template ID, so it has to be `cardanoAcademyCertificate`:
+Add an entry to `additional-templates.json` in uverify-ui. The `name` becomes the template ID, so it has to be `cardanoAcademyCertificate`. `ogImage` makes the UI build copy the link preview image to `public/og/cardanoAcademyCertificate.png`:
 
 ```json
 {
@@ -61,7 +70,8 @@ Add an entry to `additional-templates.json` in uverify-ui. The `name` becomes th
   "name": "cardanoAcademyCertificate",
   "url": "https://github.com/UVerify-io/uverify-additional-templates",
   "commit": "<commit>",
-  "path": "cardano-academy-certificate/src/Certificate.tsx"
+  "path": "cardano-academy-certificate/src/Certificate.tsx",
+  "ogImage": "cardano-academy-certificate/og.png"
 }
 ```
 
