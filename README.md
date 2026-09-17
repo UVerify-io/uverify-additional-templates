@@ -45,6 +45,8 @@ export default MyTemplate;
 
 | Template | Description |
 |---|---|
+| `cardano-academy-certificate` | Cardano Academy badge issued by the Cardano Foundation, with privacy-protected recipient names and issuer identity (vLEI) binding |
+| `food-analysis-report` | Food analysis laboratory report |
 | `social-hub` | Connected-goods social profile page, built for the Cardano Buidler Fest 2025 t-shirt experience |
 | `tadamon` | CSO certificate template for the UNDP Tadamon programme |
 
